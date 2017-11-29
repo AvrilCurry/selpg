@@ -1,0 +1,2 @@
+2017/11/24 19:57:05 Type: Error 16 occur at line 249. 
+	./selpg : end-page(3) is greater than total-page(2), less output than expected.

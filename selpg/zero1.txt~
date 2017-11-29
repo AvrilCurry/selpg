@@ -1,0 +1,67 @@
+不论应用是如何部署的，我们都期望能扑捉到应用的错误日志，
+
+解决思路：
+
+    自己写代码处理异常拦截，甚至直接在main函数中写异常拦截。
+    stderr重定向到某个文件里
+    使用 syscall.Dup2
+
+第一种方法比较简单， 我们这里主要看后两种：
+
+使用 stderr替换的代码：
+
+package main
+
+import (
+    "fmt"
+    "os"
+)
+
+func main() {
+    f, _ := os.OpenFile("C:\\tmp\\11.txt", os.O_WRONLY|os.O_CREATE|os.O_SYNC,
+        0755)
+    os.Stdout = f
+    os.Stderr = f
+    fmt.Println("fmt")
+    fmt.Print(make(map[int]int)[0])
+}
+
+这里的 Stdout 、Stderr  的含义如下， 同样也适用win：
+
+在通常情况下，UNIX每个程序在开始运行的时刻，都会有3个已经打开的stream. 分别用来输入，输出，打印诊断和错误信息。通常他们会被连接到用户终端. 但也可以改变到其它文件或设备。
+
+Linux内核启动的时候默认打开的这三个I/O设备文件：标准输入文件stdin，标准输出文件stdout，标准错误输出文件stderr，分别得到文件描述符 0, 1, 2。
+
+stdin是标准输入，stdout是标准输出，stderr是标准错误输出。大多数的命令行程序从stdin输入，输出到stdout或stderr。
+
+ 
+
+上面方法，可能会拦截不到一些系统级别的崩溃信息，这时候就需要走下面的方案了。
+
+使用 syscall.Dup2  的例子如下， 注意 windows 下会编译直接报错： undefined: syscall.Dup2， 只有 linux 下才可以用。
+
+syscall.Dup2 is a linux/OSX only thing. there's no windows equivalent。
+
+参考： https://github.com/golang/go/issues/325
+
+package main
+
+import (
+    "fmt"
+    "os"
+    "syscall"
+)
+
+func main() {
+    logFile, _ := os.OpenFile("/tmp/x", os.O_WRONLY|os.O_CREATE|os.O_SYNC, 0755)
+    syscall.Dup2(int(logFile.Fd()), 1)
+    syscall.Dup2(int(logFile.Fd()), 2)
+    fmt.Printf("Hello from fmt\n")
+    panic("Hello from panic\n")
+}
+
+ 
+
+这两个区别，我看到有下面描述文字：
+
+https://github.com/golang/go/issues/325
